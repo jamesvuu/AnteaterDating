@@ -1,0 +1,513 @@
+import {
+  profileDataProps,
+  UserData,
+  MatchData,
+  Message,
+  ApiMatchData,
+  ChatRoom,
+  ApiMessage,
+} from "@/types/types";
+
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+export const fetchProfileData = async ({
+  accessToken,
+}: {
+  accessToken: string | null;
+}): Promise<profileDataProps> => {
+  if (!accessToken) {
+    throw new Error("No access token");
+  }
+
+  const response = await fetch(`${API_URL}/profiles/`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch profile");
+  }
+
+  const profileData = await response.json();
+  const user = profileData?.user || {};
+  const email = user?.email || "";
+  const username = email
+    ? email.split("@")[0]
+    : `user_${user?.id || "unknown"}`;
+
+  return {
+    avatar: user?.profile_picture || null,
+    username: username,
+    firstName: user?.first_name || "",
+    lastName: user?.last_name || "",
+    age: profileData?.age || 18,
+    bio: profileData?.bio || "",
+    major: profileData?.major || "",
+    year: profileData?.year || "",
+    interests: profileData?.interests || [],
+    photos: profileData?.photos || [],
+    location: profileData?.location || "",
+    gender: profileData?.gender || "",
+    genderPreference: profileData?.gender_preference || [],
+  };
+};
+
+export const updateUserProfile = async (
+  userData: Partial<profileDataProps>,
+  accessToken: string | null
+): Promise<profileDataProps> => {
+  if (!accessToken) {
+    throw new Error("No access token");
+  }
+
+  const response = await fetch(`${API_URL}/profiles/`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      bio: userData.bio,
+      major: userData.major,
+      year: userData.year,
+      age: userData.age,
+      interests: userData.interests,
+      photos: userData.photos,
+      location: userData.location,
+      gender: userData.gender,
+      gender_preference: userData.genderPreference,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update profile");
+  }
+
+  return fetchProfileData({ accessToken });
+};
+
+export const updateUserSettings = async (
+  settings: Partial<UserData>,
+  accessToken: string | null
+): Promise<void> => {
+  if (!accessToken) {
+    throw new Error("No access token");
+  }
+
+  const response = await fetch(`${API_URL}/profiles/settings/`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email_notifications: settings.notiEmailNotifications,
+      match_notifications: settings.notiNewMatches,
+      message_notifications: settings.notiMessages,
+      profile_visibility: settings.priProfileVisibility,
+      show_online_status: settings.priShowOnlineStatus,
+      max_distance: settings.dpDistance,
+      age_min: settings.dpAgeRange?.[0],
+      age_max: settings.dpAgeRange?.[1],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update settings");
+  }
+};
+
+export const fetchPotentialMatches = async (
+  accessToken: string | null
+): Promise<MatchData[]> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/matching/potential/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch potential matches: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    const filteredData = data.filter((match: ApiMatchData) => match?.email);
+
+    return filteredData.map((match: ApiMatchData): MatchData => {
+      const email = match?.email || "";
+      const username = email
+        ? email.split("@")[0]
+        : `user_${match?.id || "unknown"}`;
+
+      return {
+        id: match?.id || 0,
+        name:
+          match?.first_name && match?.last_name
+            ? `${match.first_name} ${match.last_name}`
+            : "Unknown User",
+        username,
+        email: email,
+        avatar: match?.profile_picture || null,
+        bio: match?.profile?.bio || "",
+        age: match?.profile?.age || 18,
+        major: match?.profile?.major || "",
+        year: match?.profile?.year || "",
+        interests: match?.profile?.interests || [],
+        photos: match?.profile?.photos || [],
+        matchPercentage: match?.profile?.match_percentage || 0,
+        lastActive: match?.profile?.last_active || "",
+        dpAgeRange: [18, 100],
+        dpDistance: 50,
+        dpShowMe: "all",
+        dpInterests: [],
+        dpMajors: [],
+        notiNewMatches: true,
+        notiMessages: true,
+        notiAppUpdates: true,
+        notiEmailNotifications: true,
+        priProfileVisibility: "public",
+        priShowOnlineStatus: true,
+        priShowLastActive: true,
+        priAllowTagging: true,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching potential matches:", error);
+    throw error;
+  }
+};
+
+export const fetchCurrentMatches = async (
+  accessToken: string | null
+): Promise<MatchData[]> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/matching/matches/matches/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch current matches: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log('Current matches response:', data);
+    const filteredData = data.filter((match: ApiMatchData) => match?.email);
+
+    return filteredData.map((match: ApiMatchData): MatchData => {
+      const email = match?.email || "";
+      const username = email
+        ? email.split("@")[0]
+        : `user_${match?.id || "unknown"}`;
+
+      return {
+        id: match?.id || 0,
+        name:
+          match?.first_name && match?.last_name
+            ? `${match.first_name} ${match.last_name}`
+            : "Unknown User",
+        username,
+        email: email,
+        avatar: match?.profile_picture || null,
+        bio: match?.profile?.bio || "",
+        age: match?.profile?.age || 18,
+        major: match?.profile?.major || "",
+        year: match?.profile?.year || "",
+        interests: match?.profile?.interests || [],
+        photos: match?.profile?.photos || [],
+        matchPercentage: match?.profile?.match_percentage || 0,
+        lastActive: match?.profile?.last_active || "",
+        dpAgeRange: [18, 100],
+        dpDistance: 50,
+        dpShowMe: "all",
+        dpInterests: [],
+        dpMajors: [],
+        notiNewMatches: true,
+        notiMessages: true,
+        notiAppUpdates: true,
+        notiEmailNotifications: true,
+        priProfileVisibility: "public",
+        priShowOnlineStatus: true,
+        priShowLastActive: true,
+        priAllowTagging: true,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching current matches:", error);
+    throw error;
+  }
+};
+
+export const likeProfile = async (
+  userId: string,
+  accessToken: string | null
+): Promise<{ status: string; is_match: boolean; message: string }> => {
+  if (!accessToken) {
+    throw new Error("No access token found");
+  }
+
+  const response = await fetch(`${API_URL}/matching/matches/${userId}/like/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json();
+  console.log('Like response:', { status: response.status, data });
+
+  if (!response.ok) {
+    throw new Error(data.error || `Failed to like profile: ${response.statusText}`);
+  }
+
+  return data;
+};
+
+export const dislikeProfile = async (
+  userId: string,
+  accessToken: string | null
+): Promise<void> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(
+      `${API_URL}/matching/matches/${userId}/dislike/`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to dislike profile: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Error disliking profile:", error);
+    throw error;
+  }
+};
+
+export const superLikeProfile = async (
+  userId: string,
+  accessToken: string | null
+): Promise<void> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(
+      `${API_URL}/matching/matches/${userId}/superlike/`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to super like profile: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Error super liking profile:", error);
+    throw error;
+  }
+};
+
+export const fetchChatRooms = async (
+  accessToken: string | null
+): Promise<ChatRoom[]> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/chat/rooms/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch chat rooms: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    return data.map((room: any) => ({
+      id: room.id,
+      name: room.participants[0]?.first_name
+        ? `${room.participants[0].first_name} ${
+            room.participants[0].last_name || ""
+          }`
+        : "Unknown User",
+      participants: room.participants.map((participant: any) => ({
+        id: participant.id,
+        username: participant.email
+          ? participant.email.split("@")[0]
+          : `user_${participant.id}`,
+        profile_picture: participant.profile_picture,
+      })),
+      last_message: room.last_message || null,
+    }));
+  } catch (error) {
+    console.error("Error fetching chat rooms:", error);
+    throw error;
+  }
+};
+
+export const fetchChatMessages = async (
+  roomId: string,
+  accessToken: string | null
+): Promise<Message[]> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/chat/rooms/${roomId}/messages/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch chat messages: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.map((message: ApiMessage) => ({
+      id: message.id,
+      text: message.content,
+      sender: message.sender.email.split("@")[0],
+      timestamp: new Date(message.timestamp).toLocaleString(),
+    }));
+  } catch (error) {
+    console.error("Error fetching chat messages:", error);
+    throw error;
+  }
+};
+
+export const sendChatMessage = async (
+  roomId: string,
+  content: string,
+  accessToken: string | null
+): Promise<Message> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/chat/rooms/${roomId}/messages/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send message: ${response.statusText}`);
+    }
+
+    const message = await response.json();
+    return {
+      id: message.id,
+      text: message.content,
+      sender: message.sender.email.split("@")[0],
+      timestamp: new Date(message.timestamp).toLocaleString(),
+    };
+  } catch (error) {
+    console.error("Error sending message:", error);
+    throw error;
+  }
+};
+
+export const createChatRoom = async (targetUserId: string, accessToken: string | null) => {
+  if (!accessToken) {
+    throw new Error('No access token found');
+  }
+
+  const response = await fetch(`${API_URL}/chat/rooms/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ target_user_id: targetUserId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to create chat room');
+  }
+
+  const data = await response.json();
+  return data.id;
+};
+
+export const submitQuestionnaire = async (
+  answers: Record<string, unknown>,
+  accessToken: string | null
+): Promise<void> => {
+  try {
+    if (!accessToken) {
+      throw new Error("No access token found");
+    }
+
+    const response = await fetch(`${API_URL}/profiles/questionnaire/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(answers),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to submit questionnaire: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Error submitting questionnaire:", error);
+    throw error;
+  }
+};
